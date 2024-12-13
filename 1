@@ -1,0 +1,81 @@
+import com.openpages.api.OpenPagesSession;
+import com.openpages.api.service.ObjectFactory;
+import com.openpages.api.service.ServiceFactory;
+import com.openpages.api.metadata.*;
+import com.openpages.api.object.*;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.List;
+
+public class GRCDataMasking {
+
+    public static void main(String[] args) {
+        try {
+            // Authenticate and establish session
+            OpenPagesSession session = authenticate("username", "password", "server_url");
+
+            // Fetch all custom objects dynamically
+            List<OpenPageObject> objects = fetchObjects(session);
+
+            // Mask and log data
+            maskDetailsAndLogToFile(objects, "Maskingdetail.txt");
+
+            System.out.println("Data masking and logging complete.");
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // Method to authenticate with OpenPages
+    public static OpenPagesSession authenticate(String username, String password, String serverUrl) throws Exception {
+        ServiceFactory factory = new ServiceFactory();
+        return factory.createSession(username, password, serverUrl);
+    }
+
+    // Method to fetch objects dynamically from OpenPages
+    public static List<OpenPageObject> fetchObjects(OpenPagesSession session) throws Exception {
+        ObjectFactory objectFactory = session.getObjectFactory();
+        return objectFactory.getAllObjects(); // Fetch all objects (or filter by type if needed)
+    }
+
+    // Method to perform masking and log details to file
+    public static void maskDetailsAndLogToFile(List<OpenPageObject> objects, String fileName) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
+            for (OpenPageObject obj : objects) {
+                writer.write("Object: " + obj.getName() + "\n");
+
+                for (FieldGroup group : obj.getFieldGroups()) {
+                    writer.write("  Group: " + group.getName() + "\n");
+
+                    for (Field field : group.getFields()) {
+                        // Capture old value
+                        String oldValue = field.getValue();
+
+                        // Generate new value dynamically (e.g., mask sensitive fields)
+                        String newValue = generateUpdatedValue(field);
+
+                        // Update the field value in OpenPages
+                        field.setValue(newValue);
+                        obj.save();
+
+                        // Log the old and new values
+                        writer.write("    Field: " + field.getName() + " | Old Value: " + oldValue + " | New Value: " + newValue + "\n");
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error writing to file: " + e.getMessage());
+        }
+    }
+
+    // Generate a new value for the field (custom masking logic)
+    public static String generateUpdatedValue(Field field) {
+        if (field.isSensitive()) {
+            return "Masked_" + field.getName();
+        } else {
+            return "Updated_" + field.getValue();
+        }
+    }
+}
